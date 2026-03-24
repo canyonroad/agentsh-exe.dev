@@ -59,6 +59,14 @@ export async function setupAgentsh(vmName: string = VM_NAME): Promise<VMInfo> {
   const r3 = run(vmName, 'agentsh shim install-shell --root / --shim /usr/bin/agentsh-shell-shim --bash --i-understand-this-modifies-the-host')
   if (r3.exitCode !== 0) throw new Error(`shim install failed: ${r3.stderr}`)
 
+  step('Enabling shim enforcement for non-TTY sessions...')
+  // Without AGENTSH_SHIM_FORCE=1, the shim passes through when there's no TTY
+  // (e.g. non-interactive SSH commands). Set it everywhere possible:
+  // /etc/environment (PAM), /etc/profile.d/ (login shells), .bashrc (interactive bash)
+  run(vmName, 'echo "AGENTSH_SHIM_FORCE=1" >> /etc/environment')
+  run(vmName, 'echo "export AGENTSH_SHIM_FORCE=1" > /etc/profile.d/agentsh.sh')
+  run(vmName, 'echo "export AGENTSH_SHIM_FORCE=1" >> /root/.bashrc')
+
   step('Warming up shim...')
   run(vmName, '/bin/bash -c "echo shim-warmup-ok" 2>/dev/null || true')
 

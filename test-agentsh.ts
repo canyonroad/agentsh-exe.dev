@@ -150,7 +150,7 @@ async function main() {
     })
 
     // =========================================================================
-    // 4. POLICY EVALUATION (static rule evaluation via policy-test CLI)
+    // 5. POLICY EVALUATION (static rule evaluation via policy-test CLI)
     // =========================================================================
     console.log('\n=== Policy Evaluation (static) ===')
 
@@ -640,7 +640,7 @@ async function main() {
     })
 
     // =========================================================================
-    // 12. FUSE WORKSPACE & SOFT DELETE
+    // 13. FUSE WORKSPACE & SOFT DELETE
     // =========================================================================
     console.log('\n=== FUSE Workspace & Soft Delete ===')
 
