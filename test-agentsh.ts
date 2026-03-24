@@ -344,10 +344,9 @@ async function main() {
     console.log('\n=== Security Diagnostics (session) ===')
 
     await test('FUSE active (mount check)', async () => {
-      const r = await execSh('mount | grep -i -E "agentsh|fuse" || echo "FUSE NOT MOUNTED"')
+      // Check via direct SSH (session's Landlock may hide /proc mount info)
+      const r = run(vmId, 'mount | grep -i -E "agentsh|fuse" || echo "FUSE NOT MOUNTED"')
       console.log(`\n    Mount: ${r.stdout.trim().slice(0, 120)}`)
-      // FUSE may or may not mount depending on deferred trigger path;
-      // file protection still works via Landlock even without FUSE
       return r.stdout.includes('agentsh') || r.stdout.includes('fuse')
     })
 
@@ -645,9 +644,9 @@ async function main() {
     // =========================================================================
     console.log('\n=== FUSE Workspace & Soft Delete ===')
 
-    // Check FUSE session mount exists (internal workspace-mnt)
+    // Check FUSE session mount exists (via direct SSH — session Landlock hides /proc mount info)
     await test('FUSE session workspace-mnt exists', async () => {
-      const r = await execSh('mount | grep -i fuse.agentsh || mount | grep -i agentsh-workspace || echo "NONE"')
+      const r = run(vmId, 'mount | grep -i fuse.agentsh || mount | grep -i agentsh-workspace || echo "NONE"')
       console.log(`\n    FUSE: ${r.stdout.trim().slice(0, 150)}`)
       return r.stdout.includes('agentsh') && !r.stdout.includes('NONE')
     })
