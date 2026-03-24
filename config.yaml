@@ -62,17 +62,25 @@ sandbox:
   # Seccomp - per-command wrapper via agentsh-unixwrap
   seccomp:
     enabled: true
+    execve:
+      enabled: false   # ptrace handles execve; MUST remain false (validated)
     # File I/O interception via seccomp — enforces file_rules at syscall level
     file_monitor:
       enabled: true
       enforce_without_fuse: true
-    # NOTE: execve interception (seccomp.execve.enabled) is NOT enabled here.
-    # While agentsh supports it and exe.dev has seccomp_user_notify, kernel 6.12
-    # returns errno 0 for SECCOMP_USER_NOTIF_FLAG_CONTINUE on execve under
-    # no_new_privs (set automatically by seccomp). This causes allowed child
-    # processes to fail. Ptrace-based interception would work but conflicts
-    # with the seccomp wrapper. Direct command blocking (policy precheck)
-    # catches top-level sudo/su/ssh/kill/etc. reliably.
+
+  # Ptrace - execve-only interception (hybrid mode with seccomp wrapper)
+  # Catches child process execve() calls (env sudo, xargs sudo, python subprocess, etc.)
+  # that bypass the API-level command precheck.
+  ptrace:
+    enabled: true
+    trace:
+      execve: true
+      file: false      # seccomp wrapper handles file monitoring
+      network: false   # seccomp wrapper handles network monitoring
+      signal: false    # seccomp wrapper handles signal filtering
+    performance:
+      seccomp_prefilter: true
 
   # Unix socket wrapper - seccomp-based unix socket interception
   unix_sockets:
