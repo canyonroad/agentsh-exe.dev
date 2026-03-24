@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { createVM, run, copyToVM, waitForSSH, type VMInfo } from './exe.ts'
 import path from 'path'
 
-const AGENTSH_VERSION = 'v0.16.5'
+const AGENTSH_VERSION = 'v0.16.7'
 const AGENTSH_REPO = 'erans/agentsh'
 const DEB_ARCH = 'amd64'
 const VM_NAME = process.env.EXE_VM_NAME || 'agentsh-test'

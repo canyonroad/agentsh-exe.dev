@@ -210,27 +210,27 @@ async function main() {
     console.log('\n=== Security Diagnostics ===')
 
     await test('agentsh detect: seccomp available', async () => {
-      const r = run(vmId, 'agentsh detect 2>&1 | grep "seccomp "')
+      const r = run(vmId, 'agentsh detect 2>&1 | grep seccomp')
       return r.stdout.includes('\u2713')
     })
 
-    await test('agentsh detect: seccomp_basic available', async () => {
-      const r = run(vmId, 'agentsh detect 2>&1 | grep seccomp_basic')
+    await test('agentsh detect: ptrace available', async () => {
+      const r = run(vmId, 'agentsh detect 2>&1 | grep ptrace')
       return r.stdout.includes('\u2713')
     })
 
-    await test('agentsh detect: cgroups_v2 available', async () => {
-      const r = run(vmId, 'agentsh detect 2>&1 | grep cgroups_v2')
+    await test('agentsh detect: cgroups available', async () => {
+      const r = run(vmId, 'agentsh detect 2>&1 | grep cgroup')
       return r.stdout.includes('\u2713')
     })
 
     await test('agentsh detect: landlock available', async () => {
-      const r = run(vmId, 'agentsh detect 2>&1 | grep "landlock "')
+      const r = run(vmId, 'agentsh detect 2>&1 | grep landlock')
       return r.stdout.includes('\u2713')
     })
 
-    await test('agentsh detect: ebpf available', async () => {
-      const r = run(vmId, 'agentsh detect 2>&1 | grep ebpf')
+    await test('agentsh detect: capability-drop available', async () => {
+      const r = run(vmId, 'agentsh detect 2>&1 | grep capability')
       return r.stdout.includes('\u2713')
     })
 

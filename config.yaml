@@ -59,7 +59,8 @@ sandbox:
   cgroups:
     enabled: true
 
-  # Seccomp - per-command wrapper via agentsh-unixwrap
+  # Seccomp settings
+  # seccomp wrapper enabled for file_monitor; ptrace handles execve separately.
   seccomp:
     enabled: true
     execve:
