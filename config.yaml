@@ -62,6 +62,10 @@ sandbox:
   # Seccomp - per-command wrapper via agentsh-unixwrap
   seccomp:
     enabled: true
+    # File I/O interception via seccomp — enforces file_rules at syscall level
+    file_monitor:
+      enabled: true
+      enforce_without_fuse: true
     # NOTE: execve interception (seccomp.execve.enabled) is NOT enabled here.
     # While agentsh supports it and exe.dev has seccomp_user_notify, kernel 6.12
     # returns errno 0 for SECCOMP_USER_NOTIF_FLAG_CONTINUE on execve under
@@ -73,6 +77,40 @@ sandbox:
   # Unix socket wrapper - seccomp-based unix socket interception
   unix_sockets:
     enabled: true
+
+# Landlock - kernel-level filesystem restriction (v5 on exe.dev)
+# Derives write-allowed paths from policy (workspace + /tmp only),
+# blocking writes to /etc, /usr/bin, etc. even for root.
+landlock:
+  enabled: true
+  allow_execute:
+    - /usr/bin
+    - /usr/sbin
+    - /usr/local/bin
+    - /bin
+    - /sbin
+    - /usr/lib
+    - /lib
+    - /lib64
+  allow_read:
+    - /usr
+    - /lib
+    - /lib64
+    - /bin
+    - /sbin
+    - /etc
+    - /proc
+    - /sys
+    - /dev
+    - /tmp
+    - /var
+    - /root
+  allow_write:
+    - /root
+    - /workspace
+    - /tmp
+    - /var/tmp
+    - /var/lib/agentsh
 
 # Security mode - full (exe.dev VMs support ptrace, seccomp, landlock, fuse)
 security:
