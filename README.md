@@ -162,7 +162,7 @@ ssh exe.dev ssh agentsh-test "env sudo whoami"
                               Kill process (SIGKILL)
 ```
 
-Unlike E2B or similar platforms, agentsh is not baked into a custom image. It is installed at runtime on a fresh `ubuntu:22.04` VM by `setup.ts`, making the setup fully reproducible and independent of any sandbox-specific tooling.
+Unlike other sandbox platforms, agentsh is not baked into a custom image. It is installed at runtime on a fresh `ubuntu:22.04` VM by `setup.ts`, making the setup fully reproducible and independent of any sandbox-specific tooling.
 
 ## Configuration
 
@@ -196,8 +196,6 @@ agentsh-exe.dev/
 
 - [agentsh](https://github.com/canyonroad/agentsh) -- Runtime security for AI agents ([docs](https://www.agentsh.org/docs/))
 - [exe.dev](https://exe.dev) -- SSH-native cloud VM platform
-- [agentsh + E2B](https://github.com/canyonroad/e2b-agentsh) -- The same governance layer on E2B sandboxes
-- [agentsh + Daytona](https://github.com/canyonroad/daytona-agentsh) -- The same governance layer on Daytona sandboxes
 
 ## License
 
