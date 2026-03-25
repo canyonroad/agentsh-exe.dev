@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { createVM, run, copyToVM, waitForSSH, type VMInfo } from './exe.ts'
 import path from 'path'
 
-const AGENTSH_VERSION = 'v0.16.7'
+const AGENTSH_VERSION = 'v0.16.8'
 const AGENTSH_REPO = 'erans/agentsh'
 const DEB_ARCH = 'amd64'
 const VM_NAME = process.env.EXE_VM_NAME || 'agentsh-test'
@@ -59,13 +59,10 @@ export async function setupAgentsh(vmName: string = VM_NAME): Promise<VMInfo> {
   const r3 = run(vmName, 'agentsh shim install-shell --root / --shim /usr/bin/agentsh-shell-shim --bash --i-understand-this-modifies-the-host')
   if (r3.exitCode !== 0) throw new Error(`shim install failed: ${r3.stderr}`)
 
-  step('Enabling shim enforcement for non-TTY sessions...')
-  // Without AGENTSH_SHIM_FORCE=1, the shim passes through when there's no TTY
-  // (e.g. non-interactive SSH commands). Set it everywhere possible:
-  // /etc/environment (PAM), /etc/profile.d/ (login shells), .bashrc (interactive bash)
-  run(vmName, 'echo "AGENTSH_SHIM_FORCE=1" >> /etc/environment')
-  run(vmName, 'echo "export AGENTSH_SHIM_FORCE=1" > /etc/profile.d/agentsh.sh')
-  run(vmName, 'echo "export AGENTSH_SHIM_FORCE=1" >> /root/.bashrc')
+  step('Configuring shim enforcement...')
+  // Write /etc/agentsh/shim.conf so the shim enforces policy even without a TTY.
+  // This is read by the shim at startup — no env vars needed.
+  run(vmName, 'mkdir -p /etc/agentsh && echo "force=true" > /etc/agentsh/shim.conf')
 
   step('Warming up shim...')
   run(vmName, '/bin/bash -c "echo shim-warmup-ok" 2>/dev/null || true')

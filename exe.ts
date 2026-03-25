@@ -45,17 +45,41 @@ export function listVMs(): VMInfo[] {
  * Run a command on an exe.dev VM via `ssh exe.dev ssh <vmName> <cmd>`.
  * The vmName parameter is the VM name (not the ssh_dest hostname).
  */
+// Strip agentsh wrapper debug messages that SSH mixes into stdout.
+function stripAgentshDebug(s: string): string {
+  return s.split('\n').filter(l =>
+    !l.startsWith('landlock: restrictions applied') &&
+    !l.startsWith('agentsh: secure agent shell') &&
+    !l.startsWith('agentsh: auto-starting')
+  ).join('\n')
+}
+
+/**
+ * Run a command on the VM via SSH (goes through the shell shim when installed).
+ */
 export function run(vmName: string, cmd: string, timeoutMs: number = 120_000): ExecResult {
+  return runRaw(vmName, cmd, timeoutMs)
+}
+
+/**
+ * Run a command bypassing the shell shim. Only works for simple agentsh CLI
+ * commands (no pipes, no chaining) — the shim's isAgentshCommand() auto-bypasses these.
+ * For commands with pipes or that connect to localhost:18080, there is no bypass
+ * available on exe.dev's SSH gateway.
+ */
+export const runBypass = run
+
+function runRaw(vmName: string, cmd: string, timeoutMs: number = 120_000): ExecResult {
   try {
     const stdout = execSync(
       `ssh ${SSH_OPTS} exe.dev ssh ${vmName} ${JSON.stringify(cmd)}`,
       { ...EXEC_OPTS, timeout: timeoutMs, stdio: ['pipe', 'pipe', 'pipe'] }
     )
-    return { exitCode: 0, stdout: stdout.toString(), stderr: '' }
+    return { exitCode: 0, stdout: stripAgentshDebug(stdout.toString()), stderr: '' }
   } catch (err: any) {
     return {
       exitCode: err.status ?? 1,
-      stdout: (err.stdout ?? '').toString(),
+      stdout: stripAgentshDebug((err.stdout ?? '').toString()),
       stderr: (err.stderr ?? '').toString(),
     }
   }
@@ -67,7 +91,7 @@ export function run(vmName: string, cmd: string, timeoutMs: number = 120_000): E
  */
 export function writeFile(vmName: string, remotePath: string, content: string): void {
   const b64 = Buffer.from(content).toString('base64')
-  const r = run(vmName, `echo ${b64} | base64 -d > ${remotePath}`, 30_000)
+  const r = runRaw(vmName, `echo ${b64} | base64 -d > ${remotePath}`, 30_000)
   if (r.exitCode !== 0) throw new Error(`writeFile failed: ${r.stderr}`)
 }
 
@@ -79,7 +103,7 @@ export function writeFile(vmName: string, remotePath: string, content: string): 
 export function copyToVM(vmName: string, localPath: string, remotePath: string): void {
   const content = readFileSync(localPath)
   const b64 = content.toString('base64')
-  const r = run(vmName, `echo ${b64} | base64 -d > ${remotePath}`, 60_000)
+  const r = runRaw(vmName, `echo ${b64} | base64 -d > ${remotePath}`, 60_000)
   if (r.exitCode !== 0) throw new Error(`copyToVM failed: ${r.stderr}`)
 }
 
@@ -90,7 +114,7 @@ export function copyToVM(vmName: string, localPath: string, remotePath: string):
 export function waitForSSH(vmName: string, maxAttempts: number = 30, intervalMs: number = 3000): void {
   for (let i = 1; i <= maxAttempts; i++) {
     try {
-      const r = run(vmName, 'echo ssh-ready', 10_000)
+      const r = runRaw(vmName, 'echo ssh-ready', 10_000)
       if (r.exitCode === 0 && r.stdout.includes('ssh-ready')) return
     } catch {
       // SSH handshake may fail while VM is booting
