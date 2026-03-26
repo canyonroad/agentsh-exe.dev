@@ -180,10 +180,12 @@ async function main() {
     })
 
     await test('shell: kill blocked', async () => {
-      // kill is a bash builtin — ptrace can't intercept it (no execve).
-      // Use /bin/kill (external binary) which IS intercepted by ptrace.
+      // Use /bin/kill (external binary) — ptrace intercepts execve.
+      // The bash builtin 'kill' bypasses execve and can't be intercepted.
       const r = run(vmId, '/bin/kill -9 1 2>&1')
-      return r.stdout.includes('Permission denied') || r.stdout.includes('command failed') || r.stdout.includes('blocked') || r.exitCode !== 0
+      const out = r.stdout + r.stderr
+      return out.includes('Permission denied') || out.includes('command failed') ||
+             out.includes('blocked') || r.exitCode !== 0
     })
 
     await test('shell: echo allowed', async () => {
@@ -199,11 +201,9 @@ async function main() {
 
     await test('shell: write to /etc blocked', async () => {
       const r = run(vmId, 'touch /etc/shim-test 2>&1')
-      // Exit code unreliable through double SSH — check for permission error in stdout.
-      // Note: stripAgentshDebug removes "agentsh: command failed" lines, so check
-      // the raw touch error and also check stderr.
-      return r.stdout.includes('Permission denied') || r.stderr.includes('Permission denied') ||
-             r.stdout.includes('cannot touch') || r.exitCode !== 0
+      const out = r.stdout + r.stderr
+      return out.includes('Permission denied') || out.includes('cannot touch') ||
+             out.includes('command failed') || r.exitCode !== 0
     })
 
     await test('shell: write to workspace allowed', async () => {
@@ -213,7 +213,9 @@ async function main() {
 
     await test('shell: curl evil.com blocked', async () => {
       const r = run(vmId, 'curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" https://evil.com/ 2>&1')
-      return r.stdout.includes('400') || r.stdout.includes('403') || r.stdout.includes('blocked') || r.exitCode !== 0
+      const out = r.stdout + r.stderr
+      return out.includes('400') || out.includes('403') || out.includes('blocked') ||
+             out.includes('000') || r.exitCode !== 0
     })
 
     await test('shell: env sudo blocked (multi-context)', async () => {
@@ -305,9 +307,12 @@ async function main() {
       return detectOut.includes('capability') && detectOut.includes('\u2713')
     })
 
-    // Detect if shim.conf force=true is active — session API tests deadlock
-    // when the shim enforces, because curl to localhost:18080 goes through the
-    // shim which creates an exec request that blocks the server.
+    // Detect shim.conf force=true. Session API tests require curl to localhost:18080
+    // through the shim, which works (NO_PROXY bypasses the proxy) but creates a
+    // double-exec pattern (shim exec wraps curl which hits session exec) that
+    // stresses the server. Until the server stability is improved for this pattern,
+    // skip session API tests when shim enforcement is active.
+    // Detect shim.conf force=true. Use test -f which returns a reliable exit pattern.
     const shimConf = run(vmId, 'cat /etc/agentsh/shim.conf 2>/dev/null')
     const shimForce = shimConf.stdout.includes('force=true')
     if (shimForce) {

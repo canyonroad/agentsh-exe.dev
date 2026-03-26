@@ -64,6 +64,12 @@ export async function setupAgentsh(vmName: string = VM_NAME): Promise<VMInfo> {
   // This is read by the shim at startup — no env vars needed.
   run(vmName, 'mkdir -p /etc/agentsh && echo "force=true" > /etc/agentsh/shim.conf')
 
+  step('Disabling dangerous bash builtins...')
+  // BASH_ENV is sourced by non-interactive bash (bash -c "...") before executing
+  // commands. Disabling builtins forces bash to use external binaries (/bin/kill etc.)
+  // which ptrace CAN intercept. Without this, builtins bypass execve entirely.
+  run(vmName, 'echo "enable -n kill" > /etc/agentsh/bash_env.sh')
+
   step('Warming up shim...')
   run(vmName, '/bin/bash -c "echo shim-warmup-ok" 2>/dev/null || true')
 
