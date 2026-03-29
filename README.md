@@ -1,6 +1,6 @@
 # agentsh + exe.dev
 
-Runtime security governance for AI agents using [agentsh](https://github.com/canyonroad/agentsh) v0.16.7 with [exe.dev](https://exe.dev) VMs. 76/76 security tests passing.
+Runtime security governance for AI agents using [agentsh](https://github.com/canyonroad/agentsh) v0.16.9 with [exe.dev](https://exe.dev) VMs. 90 security tests across 13 categories.
 
 ## Why agentsh + exe.dev?
 
@@ -48,6 +48,7 @@ agentsh adds the governance layer that controls what agents can do inside the VM
 | | Environment variable filtering |
 | | Secret detection and redaction (DLP) |
 | | Bash builtin interception (BASH_ENV) |
+| | Shell shim enforcement (shim.conf force) |
 | | Soft-delete file quarantine |
 | | LLM request auditing |
 | | Complete audit logging |
@@ -70,7 +71,7 @@ npm install
 # Provision a VM and install agentsh (takes ~2 minutes)
 npx tsx setup.ts
 
-# Run the full test suite (76 tests)
+# Run the full test suite (90 tests)
 npx tsx test-agentsh.ts
 ```
 
@@ -84,19 +85,21 @@ ssh exe.dev rm agentsh-test
 
 ## What the Tests Cover
 
-The `test-agentsh.ts` script provisions an exe.dev VM, installs agentsh, and runs 76 security tests across 11 categories:
+The `test-agentsh.ts` script provisions an exe.dev VM, installs agentsh, and runs 90 security tests across 13 categories:
 
-1. **Installation** -- agentsh binary present, version correct, seccomp linkage
-2. **Server & config** -- health check, policy and config files in place, FUSE enabled, seccomp active
+1. **Installation** -- agentsh binary present, seccomp linkage
+2. **Server & config** -- health check, policy and config files in place, FUSE and seccomp enabled
 3. **Shell shim** -- shim installed, `bash.real` preserved, commands routed through policy engine
-4. **Policy evaluation** -- static `policy-test` for sudo, echo, workspace, credentials, /etc
-5. **Security diagnostics** -- `agentsh detect`: seccomp, ptrace, cgroups, landlock, capability-drop
-6. **Command blocking** -- sudo, su, ssh, kill, rm -rf blocked; echo, python3, git allowed
-7. **Network blocking** -- npmjs.org allowed; metadata (169.254.169.254), evil.com, private networks blocked
-8. **Environment policy** -- AWS/ANTHROPIC/SECRET vars filtered; HOME, PATH present; BASH_ENV set
-9. **File I/O** -- workspace and /tmp writes allowed; /etc, /usr/bin writes blocked via Landlock + seccomp file_monitor; symlink escape blocked; credential paths blocked
-10. **Multi-context blocking** -- sudo blocked via env, xargs, find -exec, nested scripts, Python subprocess, and os.system (ptrace execve interception)
-11. **FUSE soft delete** -- workspace file quarantine and recovery
+4. **Shell shim enforcement** -- direct SSH tests: sudo/su/ssh/kill blocked, echo/python3 allowed, /etc writes blocked, evil.com blocked, env sudo blocked
+5. **Policy evaluation** -- static `policy-test` for sudo, echo, workspace, credentials, /etc, soft-delete
+6. **Security diagnostics** -- `agentsh detect`: seccomp, ptrace, cgroups, landlock, capability-drop
+7. **Security diagnostics (session)** -- FUSE mount active, HTTPS_PROXY set
+8. **Command blocking** -- sudo, su, ssh, kill, rm -rf blocked; echo, python3, git allowed
+9. **Network blocking** -- npmjs.org allowed; metadata (169.254.169.254), evil.com, private networks, github.com blocked (default-deny)
+10. **Environment policy** -- AWS/OPENAI/SECRET vars filtered; HOME, PATH present; BASH_ENV set
+11. **File I/O** -- workspace and /tmp writes allowed; /etc, /usr/bin writes blocked via FUSE + Landlock; symlink escape blocked; credential paths (/root/.ssh, /root/.aws, /proc/1/environ) blocked
+12. **Multi-context blocking** -- sudo blocked via env, xargs, find -exec, nested scripts, direct /usr/bin/sudo, Python subprocess, and os.system (ptrace execve interception)
+13. **FUSE soft delete** -- workspace file quarantine and recovery via `agentsh trash`
 
 ## How It Works
 
@@ -119,6 +122,9 @@ ssh exe.dev ssh agentsh-test agentsh server &   # start policy engine
        |
        v
 ssh exe.dev ssh agentsh-test agentsh shim install-shell  # replace /bin/bash
+       |
+       v
+echo "force=true" > /etc/agentsh/shim.conf   # enforce policy without TTY
 ```
 
 Once the shell shim is installed, every command that runs on the VM passes through the agentsh policy engine -- no explicit `agentsh exec` calls needed.
@@ -129,6 +135,7 @@ exe.dev VMs (kernel 6.12) provide full security primitive support. agentsh uses 
 
 | Layer | Mechanism | What it enforces |
 |-------|-----------|-----------------|
+| **Shell shim** | Static binary replacing /bin/bash | Routes all commands through policy engine; shim.conf forces enforcement without TTY |
 | **Policy precheck** | API-level command evaluation | Blocks sudo, su, ssh, kill, rm -rf before execution |
 | **Ptrace** | execve-only tracing | Catches child process escalation (env sudo, xargs sudo, Python subprocess) |
 | **Landlock v5** | Kernel path restrictions | Blocks writes to /etc, /usr/bin even for root; restricts execute paths |
@@ -186,7 +193,7 @@ See the [agentsh documentation](https://www.agentsh.org/docs/) for the full poli
 agentsh-exe.dev/
 ├── exe.ts               # SSH wrapper: createVM, destroyVM, run, copyToVM, writeFile, waitForSSH
 ├── setup.ts             # Provisions a VM and installs agentsh end-to-end
-├── test-agentsh.ts      # Security test suite (76 tests, 11 categories)
+├── test-agentsh.ts      # Security test suite (90 tests, 13 categories)
 ├── config.yaml          # agentsh server config (ptrace, seccomp, FUSE, Landlock, DLP, network)
 ├── default.yaml         # Security policy (commands, network, files, env vars)
 └── package.json

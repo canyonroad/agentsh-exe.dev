@@ -59,7 +59,9 @@ function stripAgentshDebug(s: string): string {
     !l.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} /) &&
     // Go server startup messages
     !l.startsWith('listen tcp') &&
-    !l.startsWith('server unreachable')
+    !l.startsWith('server unreachable') &&
+    // Kernel ptrace warnings from v0.16.9+
+    !l.startsWith('PR_SET_PTRACER')
   ).join('\n')
 }
 

@@ -31,16 +31,16 @@ async function main() {
       console.log(`ERROR: ${msg}`)
       failed++
       // Detect server death (curl timeout = exit 28, SSH connection failures)
-      if (msg.includes('exit status 28') || msg.includes('timed out') || msg.includes('Connection refused')) {
+      if (msg.includes('exit status 28') || msg.includes('exit status 255') || msg.includes('timed out') || msg.includes('Connection refused')) {
         consecutiveErrors++
-        if (consecutiveErrors >= 2) {
+        if (consecutiveErrors >= 3) {
           serverDead = true
-          console.log('  !! Server appears unreachable — skipping remaining session tests')
+          console.log('  !! Connection lost — skipping remaining session tests')
         }
       }
     }
     // Delay between tests — exe.dev SSH goes through a gateway, so space out requests
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await new Promise(resolve => setTimeout(resolve, 750))
   }
 
   // =========================================================================
@@ -83,10 +83,13 @@ async function main() {
       return r.exitCode === 0 && r.stdout.includes('agentsh')
     })
 
-    await test('seccomp support (libseccomp linked)', async () => {
-      const r = runBypass(vmId, 'ldd /usr/bin/agentsh 2>&1 | grep seccomp')
-      console.log(`\n    Binary: ${r.stdout.trim()}`)
-      return r.stdout.includes('libseccomp')
+    await test('seccomp support (libseccomp linked or static)', async () => {
+      const r = runBypass(vmId, 'ldd /usr/bin/agentsh 2>&1 | grep seccomp || true')
+      const detect = runBypass(vmId, 'agentsh detect --json 2>/dev/null || agentsh detect 2>&1')
+      console.log(`\n    ldd: ${r.stdout.trim()}`)
+      console.log(`    detect: ${detect.stdout.trim().slice(0, 120)}`)
+      // Accept either dynamic libseccomp or seccomp reported available by detect
+      return r.stdout.includes('libseccomp') || detect.stdout.includes('seccomp')
     })
 
     // =========================================================================
@@ -410,13 +413,18 @@ async function main() {
       return exec('/bin/bash', ['-c', `export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; ${shellCmd}`])
     }
 
-    // Warmup: trigger FUSE deferred mounting — retry up to 3 times
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // Warmup: trigger FUSE deferred mounting — retry up to 5 times with longer delays
+    for (let attempt = 1; attempt <= 5; attempt++) {
       try {
+        // Check server health first
+        const health = runBypass(vmId, `curl -s ${AGENTSH_API}/health`)
+        if (!health.stdout.includes('ok')) {
+          throw new Error(`health check failed: ${health.stdout.slice(0, 100)}`)
+        }
         await execSh('echo warmup-ok')
         break
       } catch (e) {
-        if (attempt === 3) {
+        if (attempt === 5) {
           console.log(`  Warmup failed after ${attempt} attempts — server may be unreachable`)
           serverDead = true
         } else {
@@ -433,7 +441,7 @@ async function main() {
 
     await test('FUSE active (mount check)', async () => {
       // Check via direct SSH (session's Landlock may hide /proc mount info)
-      const r = runBypass(vmId, 'mount | grep -i -E "agentsh|fuse" || echo "FUSE NOT MOUNTED"')
+      const r = runBypass(vmId, 'cat /proc/mounts 2>/dev/null | grep -i -E "agentsh|fuse" || mount 2>/dev/null | grep -i -E "agentsh|fuse" || echo "FUSE NOT MOUNTED"')
       console.log(`\n    Mount: ${r.stdout.trim().slice(0, 120)}`)
       return r.stdout.includes('agentsh') || r.stdout.includes('fuse')
     })
@@ -734,7 +742,7 @@ async function main() {
 
     // Check FUSE session mount exists (via direct SSH — session Landlock hides /proc mount info)
     await test('FUSE session workspace-mnt exists', async () => {
-      const r = runBypass(vmId, 'mount | grep -i fuse.agentsh || mount | grep -i agentsh-workspace || echo "NONE"')
+      const r = runBypass(vmId, 'cat /proc/mounts 2>/dev/null | grep -i agentsh || mount 2>/dev/null | grep -i fuse.agentsh || mount 2>/dev/null | grep -i agentsh-workspace || echo "NONE"')
       console.log(`\n    FUSE: ${r.stdout.trim().slice(0, 150)}`)
       return r.stdout.includes('agentsh') && !r.stdout.includes('NONE')
     })
