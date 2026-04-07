@@ -1,6 +1,6 @@
 # agentsh + exe.dev
 
-Runtime security governance for AI agents using [agentsh](https://github.com/canyonroad/agentsh) v0.16.9 with [exe.dev](https://exe.dev) VMs. 90 security tests across 13 categories.
+Runtime security governance for AI agents using [agentsh](https://github.com/canyonroad/agentsh) v0.17.0 with [exe.dev](https://exe.dev) VMs. 90 security tests across 13 categories.
 
 ## Why agentsh + exe.dev?
 

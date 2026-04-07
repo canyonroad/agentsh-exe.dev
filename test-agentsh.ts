@@ -85,7 +85,7 @@ async function main() {
 
     await test('seccomp support (libseccomp linked or static)', async () => {
       const r = runBypass(vmId, 'ldd /usr/bin/agentsh 2>&1 | grep seccomp || true')
-      const detect = runBypass(vmId, 'agentsh detect --json 2>/dev/null || agentsh detect 2>&1')
+      const detect = runBypass(vmId, 'agentsh detect')
       console.log(`\n    ldd: ${r.stdout.trim()}`)
       console.log(`    detect: ${detect.stdout.trim().slice(0, 120)}`)
       // Accept either dynamic libseccomp or seccomp reported available by detect
@@ -215,7 +215,7 @@ async function main() {
     })
 
     await test('shell: curl evil.com blocked', async () => {
-      const r = run(vmId, 'curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" https://evil.com/ 2>&1')
+      const r = run(vmId, 'curl -s --connect-timeout 5 -o /tmp/.curl_discard -w "%{http_code}" https://evil.com/ 2>&1')
       const out = r.stdout + r.stderr
       return out.includes('400') || out.includes('403') || out.includes('blocked') ||
              out.includes('000') || r.exitCode !== 0
@@ -315,8 +315,9 @@ async function main() {
     // double-exec pattern (shim exec wraps curl which hits session exec) that
     // stresses the server. Until the server stability is improved for this pattern,
     // skip session API tests when shim enforcement is active.
-    // Detect shim.conf force=true. Use test -f which returns a reliable exit pattern.
-    const shimConf = run(vmId, 'cat /etc/agentsh/shim.conf 2>/dev/null')
+    // NOTE: Do NOT use `2>/dev/null` here — the shim applies landlock which blocks
+    // writes to /dev/null. If the file doesn't exist, cat's stderr is harmless.
+    const shimConf = run(vmId, 'cat /etc/agentsh/shim.conf')
     const shimForce = shimConf.stdout.includes('force=true')
     if (shimForce) {
       console.log('\n--- shim.conf force=true detected: skipping session API tests ---')
@@ -332,7 +333,7 @@ async function main() {
 
     // Manually enable FUSE (deferred mount requires /dev/fuse to be writable)
     // In exe.dev, FUSE is configured during setup; just ensure /dev/fuse is accessible
-    runBypass(vmId, 'chmod 666 /dev/fuse 2>/dev/null || true')
+    runBypass(vmId, 'chmod 666 /dev/fuse || true')
     // Allow FUSE setup to complete before creating session
     await new Promise(resolve => setTimeout(resolve, 3000))
 
@@ -441,7 +442,7 @@ async function main() {
 
     await test('FUSE active (mount check)', async () => {
       // Check via direct SSH (session's Landlock may hide /proc mount info)
-      const r = runBypass(vmId, 'cat /proc/mounts 2>/dev/null | grep -i -E "agentsh|fuse" || mount 2>/dev/null | grep -i -E "agentsh|fuse" || echo "FUSE NOT MOUNTED"')
+      const r = runBypass(vmId, 'cat /proc/mounts || mount')
       console.log(`\n    Mount: ${r.stdout.trim().slice(0, 120)}`)
       return r.stdout.includes('agentsh') || r.stdout.includes('fuse')
     })
@@ -742,7 +743,7 @@ async function main() {
 
     // Check FUSE session mount exists (via direct SSH — session Landlock hides /proc mount info)
     await test('FUSE session workspace-mnt exists', async () => {
-      const r = runBypass(vmId, 'cat /proc/mounts 2>/dev/null | grep -i agentsh || mount 2>/dev/null | grep -i fuse.agentsh || mount 2>/dev/null | grep -i agentsh-workspace || echo "NONE"')
+      const r = runBypass(vmId, 'cat /proc/mounts || mount')
       console.log(`\n    FUSE: ${r.stdout.trim().slice(0, 150)}`)
       return r.stdout.includes('agentsh') && !r.stdout.includes('NONE')
     })
