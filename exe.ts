@@ -61,7 +61,9 @@ function stripAgentshDebug(s: string): string {
     !l.startsWith('listen tcp') &&
     !l.startsWith('server unreachable') &&
     // Kernel ptrace warnings from v0.16.9+
-    !l.startsWith('PR_SET_PTRACER')
+    !l.startsWith('PR_SET_PTRACER') &&
+    // Yama-aware ptrace notice from v0.18.0+ (when Yama LSM isn't loaded)
+    !l.startsWith('yama:')
   ).join('\n')
 }
 
