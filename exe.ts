@@ -51,10 +51,7 @@ function stripAgentshDebug(s: string): string {
     !l.startsWith('landlock: restrictions applied') &&
     !l.startsWith('agentsh: secure agent shell') &&
     !l.startsWith('agentsh: auto-starting') &&
-    !l.startsWith('agentsh: blocked by policy') &&
     !l.startsWith('agentsh: hint:') &&
-    !l.startsWith('agentsh: command failed') &&
-    !l.startsWith('blocked by policy') &&
     // Server log lines that leak through the shim (timestamp-prefixed)
     !l.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} /) &&
     // Go server startup messages
